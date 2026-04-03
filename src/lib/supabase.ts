@@ -1,13 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Mengambil data dari env dengan fallback (cadangan) string kosong agar tidak crash
+// 1. Ambil data dari .env.local
+// Gunakan || '' agar jika kunci kosong, aplikasi tidak langsung mati/error
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Buat client
+// 2. Buat koneksi ke Supabase
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Debug sederhana: Muncul di console browser (F12) jika kunci tidak terbaca
+// 3. Tambahkan pengecekan otomatis (Muncul di F12 Console)
+// Ini akan memberi tahu kamu jika file .env.local belum terbaca oleh Vite
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Waduh! Kunci Supabase tidak ditemukan di .env.local");
+  console.error("⚠️ Error: VITE_SUPABASE_URL atau VITE_SUPABASE_ANON_KEY tidak ditemukan!");
+  console.log("Pastikan kamu sudah membuat file .env.local di folder luar dan melakukan restart terminal (npm run dev).");
 }

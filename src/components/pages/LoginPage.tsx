@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { GraduationCap } from 'lucide-react'; // Pakai lucide-react, bukan lucide-material
+import { GraduationCap } from 'lucide-react';
 
 const LoginPage = () => {
   const handleGoogleLogin = async () => {
@@ -15,8 +15,7 @@ const LoginPage = () => {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-slate-100 text-center">
         <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
-          {/* Menggunakan komponen GraduationCap dari lucide-react */}
-          <GraduationCap className="text-white w-10 h-10" /> 
+          <GraduationCap className="w-10 h-10 text-white" />
         </div>
         <h1 className="text-2xl font-bold text-slate-900">Guru Digital</h1>
         <p className="text-slate-500 mt-2 mb-8">Selamat datang! Silakan masuk untuk mengakses dokumen Anda.</p>
