@@ -21,7 +21,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
   const [documents, setDocuments] = useState<GeneratedDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<GeneratedDoc | null>(null);
@@ -34,7 +34,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) return;
 
       const { data, error } = await supabase
@@ -72,7 +72,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Yakin ingin menghapus dokumen ini?')) return;
-    
+
     try {
       const { error } = await supabase
         .from('generated_documents')
@@ -80,7 +80,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
         .eq('id', id);
 
       if (error) throw error;
-      
+
       fetchHistory(); // Refresh the list
     } catch (error: any) {
       console.error('Failed to delete:', error.message);
@@ -173,7 +173,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
               Riwayat dokumen Anda kosong. Mulai rancang modul ajar pertama Anda dengan bantuan kecerdasan buatan sekarang!
             </p>
             {onNavigate && (
-              <button 
+              <button
                 onClick={() => onNavigate('create-modul')}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium shadow-md transition-all active:scale-95"
               >
@@ -216,23 +216,23 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-1">
-                        <button 
+                        <button
                           onClick={() => handleView(item)}
-                          className="p-2 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-colors" 
+                          className="p-2 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-colors"
                           title="Lihat Konten"
                         >
                           <Eye className="w-5 h-5" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDownload(item.title, item.output_content)}
-                          className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-colors" 
+                          className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-colors"
                           title="Download Word"
                         >
                           <Download className="w-5 h-5" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDelete(item.id)}
-                          className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors" 
+                          className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
                           title="Hapus Dokumen"
                         >
                           <Trash2 className="w-5 h-5" />
@@ -259,14 +259,14 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
                   Format: {getTemplateName(selectedDoc)} • Dibuat pada: {new Date(selectedDoc.created_at).toLocaleString('id-ID')}
                 </p>
               </div>
-              <button 
+              <button
                 onClick={closeModal}
                 className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto flex-1 font-sans">
               <div className="prose prose-sm prose-blue max-w-none text-slate-700">
@@ -275,16 +275,16 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
                 </pre>
               </div>
             </div>
-            
+
             {/* Modal Footer */}
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 rounded-b-2xl">
-              <button 
+              <button
                 onClick={closeModal}
                 className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
               >
                 Tutup
               </button>
-              <button 
+              <button
                 onClick={() => handleDownload(selectedDoc.title, selectedDoc.output_content)}
                 className="px-4 py-2 font-medium text-white bg-slate-800 hover:bg-slate-900 rounded-lg flex items-center gap-2 transition-all shadow-md"
               >
