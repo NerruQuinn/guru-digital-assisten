@@ -6,10 +6,12 @@ import DashboardPage from './components/pages/DashboardPage';
 import TemplatesPage from './components/pages/TemplatesPage';
 import HistoryPage from './components/pages/HistoryPage';
 import LoginPage from './components/pages/LoginPage';
+import CreateModulPage from './components/pages/CreateModulPage';
+import UploadTemplatePage from './components/pages/UploadTemplatePage';
+import ManageUsersPage from './components/pages/ManageUsersPage';
 
 function App() {
   const [session, setSession] = useState<any>(null);
-  // Langsung ambil dari localStorage sebagai initial value
   const [role, setRole] = useState<string | null>(localStorage.getItem('userRole'));
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState('dashboard');
@@ -49,8 +51,6 @@ function App() {
         if (error) throw error;
 
         const userRole = data?.role ?? 'guru';
-        console.log('Role ditemukan:', userRole);
-        // Simpan ke localStorage supaya next load langsung terbaca
         localStorage.setItem('userRole', userRole);
         setRole(userRole);
         setLoading(false);
@@ -61,7 +61,6 @@ function App() {
       }
     }
 
-    // Kalau semua gagal, pakai cache dari localStorage atau default guru
     const cached = localStorage.getItem('userRole') ?? 'guru';
     setRole(cached);
     setLoading(false);
@@ -74,6 +73,7 @@ function App() {
     'upload-template': { title: 'Upload Template', breadcrumb: 'Upload Template' },
     'manage-users': { title: 'Kelola Guru', breadcrumb: 'Kelola Guru' },
     settings: { title: 'Admin Settings', breadcrumb: 'Settings' },
+    'create-modul': { title: 'Buat Modul Ajar', breadcrumb: 'Buat Modul Ajar' },
   };
 
   const currentPage = pageConfig[activePage] ?? { title: 'Dashboard', breadcrumb: 'Dashboard' };
@@ -107,15 +107,19 @@ function App() {
           user={session.user}
         />
         <div className="flex-1 overflow-auto">
-          {activePage === 'dashboard' && <DashboardPage role={role} />}
+          {activePage === 'dashboard' && (
+            <DashboardPage
+              role={role}
+              onNavigate={setActivePage}
+            />
+          )}
+          {activePage === 'create-modul' && (
+            <CreateModulPage onBack={() => setActivePage('dashboard')} />
+          )}
           {activePage === 'templates' && <TemplatesPage role={role} />}
-          {activePage === 'history' && <HistoryPage />}
-          {activePage === 'upload-template' && (
-            <div className="p-8 text-slate-400">Halaman Upload Template (coming soon)</div>
-          )}
-          {activePage === 'manage-users' && (
-            <div className="p-8 text-slate-400">Halaman Kelola Guru (coming soon)</div>
-          )}
+          {activePage === 'history' && <HistoryPage onNavigate={setActivePage} />}
+          {activePage === 'upload-template' && <UploadTemplatePage />}
+          {activePage === 'manage-users' && <ManageUsersPage />}
         </div>
       </main>
     </div>

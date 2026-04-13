@@ -1,157 +1,299 @@
-import { Download, Eye, RotateCcw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download, Eye, Trash2, Search, FileText, X, CheckCircle2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { generateDocx } from '../../lib/generateDocx';
 
-const HistoryPage = () => {
-  const history = [
-    {
-      id: 1,
-      title: 'Rencana Pembelajaran - Fungsi Kuadrat',
-      subject: 'Matematika',
-      class: 'Kelas 10',
-      type: 'Rencana Pembelajaran',
-      generated: '2024-02-20 14:30',
-      tokens: 850,
-      status: 'Selesai',
-    },
-    {
-      id: 2,
-      title: 'Soal Ujian Mid Semester - Bahasa Inggris',
-      subject: 'Bahasa Inggris',
-      class: 'Kelas 11',
-      type: 'Soal Ujian',
-      generated: '2024-02-19 10:15',
-      tokens: 1200,
-      status: 'Selesai',
-    },
-    {
-      id: 3,
-      title: 'Modul Ajar - Sistem Reproduksi Manusia',
-      subject: 'IPA',
-      class: 'Kelas 9',
-      type: 'Modul Ajar',
-      generated: '2024-02-18 16:45',
-      tokens: 1500,
-      status: 'Selesai',
-    },
-    {
-      id: 4,
-      title: 'Ringkasan Materi - Era Reformasi Indonesia',
-      subject: 'Sejarah',
-      class: 'Kelas 10',
-      type: 'Rencana Pembelajaran',
-      generated: '2024-02-17 09:20',
-      tokens: 920,
-      status: 'Selesai',
-    },
-    {
-      id: 5,
-      title: 'Latihan Soal - Negara-Negara ASEAN',
-      subject: 'IPS',
-      class: 'Kelas 8',
-      type: 'Soal Ujian',
-      generated: '2024-02-16 13:00',
-      tokens: 680,
-      status: 'Selesai',
-    },
-    {
-      id: 6,
-      title: 'Diskusi Interaktif - Perubahan Sosial',
-      subject: 'IPS',
-      class: 'Kelas 9',
-      type: 'Modul Ajar',
-      generated: '2024-02-15 11:30',
-      tokens: 1100,
-      status: 'Selesai',
-    },
-    {
-      id: 7,
-      title: 'Soal Formatif - Persamaan Linear',
-      subject: 'Matematika',
-      class: 'Kelas 10',
-      type: 'Soal Ujian',
-      generated: '2024-02-14 15:45',
-      tokens: 750,
-      status: 'Selesai',
-    },
-  ];
+interface HistoryPageProps {
+  onNavigate?: (page: string) => void;
+}
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Selesai':
-        return 'bg-green-50 text-green-700';
-      case 'Proses':
-        return 'bg-blue-50 text-blue-700';
-      default:
-        return 'bg-slate-50 text-slate-700';
+interface GeneratedDoc {
+  id: string;
+  title: string;
+  input_data: any;
+  output_content: string;
+  created_at: string;
+  template_id: string;
+  templates?: any;
+}
+
+const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
+  const [documents, setDocuments] = useState<GeneratedDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState<GeneratedDoc | null>(null);
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const fetchHistory = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('generated_documents')
+        .select(`
+          id, 
+          title, 
+          input_data, 
+          output_content, 
+          created_at, 
+          template_id,
+          templates ( name )
+        `)
+        .eq('guru_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setDocuments(data || []);
+    } catch (error: any) {
+      console.error('Error fetching history:', error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  return (
-    <div className="p-8 space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Riwayat Pembuatan</h2>
-        <p className="text-slate-600 mt-1">Lihat semua materi yang telah dibuat menggunakan AI</p>
-      </div>
+  const handleView = (doc: GeneratedDoc) => {
+    setSelectedDoc(doc);
+    setIsModalOpen(true);
+  };
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Judul</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Mata Pelajaran</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Kelas</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Tipe</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Tanggal Dibuat</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Token</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Status</th>
-                <th className="px-6 py-3 text-center text-sm font-semibold text-slate-900">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {history.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-slate-900 max-w-xs">{item.title}</p>
-                  </td>
-                  <td className="px-6 py-4 text-slate-600 text-sm">{item.subject}</td>
-                  <td className="px-6 py-4 text-slate-600 text-sm">{item.class}</td>
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium">
-                      {item.type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-600 text-sm">{item.generated}</td>
-                  <td className="px-6 py-4 text-slate-600 text-sm text-center font-medium">{item.tokens}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <button className="p-2 hover:bg-blue-50 rounded-lg transition-colors text-blue-600" title="Lihat">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600" title="Download">
-                        <Download className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600" title="Buat Ulang">
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedDoc(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Yakin ingin menghapus dokumen ini?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('generated_documents')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      fetchHistory(); // Refresh the list
+    } catch (error: any) {
+      console.error('Failed to delete:', error.message);
+      alert('Gagal menghapus dokumen.');
+    }
+  };
+
+  const handleDownload = async (title: string, content: string) => {
+    try {
+      await generateDocx(title, content);
+    } catch (err) {
+      console.error('Download failed', err);
+      alert('Gagal mengunduh dokumen.');
+    }
+  };
+
+  const getMapel = (inputData: any) => {
+    if (!inputData) return '-';
+    if (inputData.mapel) return inputData.mapel; // structure lama
+    if (inputData.step1?.mapel) return inputData.step1.mapel; // structure wizard baru
+    return '-';
+  };
+
+  const getKelas = (inputData: any) => {
+    if (!inputData) return '-';
+    if (inputData.kelas) return inputData.kelas;
+    if (inputData.step1?.grade) return inputData.step1.grade;
+    return '-';
+  };
+
+  const getTopik = (inputData: any) => {
+    if (!inputData) return '-';
+    if (inputData.topik) return inputData.topik;
+    if (inputData.step1?.topik) return inputData.step1.topik;
+    return '-';
+  };
+
+  const getTemplateName = (doc: GeneratedDoc) => {
+    if (!doc.templates) return 'Unknown Template';
+    if (Array.isArray(doc.templates)) {
+      return doc.templates[0]?.name || 'Unknown Template';
+    }
+    return doc.templates.name || 'Unknown Template';
+  };
+
+  // Filter based on Title or Subject (mapel)
+  const filteredDocs = documents.filter((doc) => {
+    const term = searchQuery.toLowerCase();
+    const mapel = getMapel(doc.input_data).toLowerCase();
+    return doc.title?.toLowerCase().includes(term) || mapel.includes(term);
+  });
+
+  return (
+    <div className="p-8 space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">Riwayat Pembuatan</h2>
+          <p className="text-slate-600 mt-1">Lihat semua materi dan modul ajar yang telah dibuat menggunakan AI</p>
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <p className="text-blue-900 text-sm">
-          Menampilkan 7 riwayat terbaru. Total penggunaan token bulan ini: <span className="font-bold">6,900 / 10,000</span>
-        </p>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden min-h-[400px]">
+        {/* Toolbar */}
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+          <div className="relative max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Cari berdasarkan judul atau mata pelajaran..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 w-full rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm"
+            />
+          </div>
+        </div>
+
+        {/* Content Area */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-slate-500 font-medium">Memuat riwayat dokumen...</p>
+          </div>
+        ) : filteredDocs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+            <div className="bg-blue-50 p-6 rounded-full mb-4">
+              <FileText className="w-16 h-16 text-blue-300" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-700 mb-2">Belum ada modul yang dibuat</h3>
+            <p className="text-slate-500 max-w-sm mb-6">
+              Riwayat dokumen Anda kosong. Mulai rancang modul ajar pertama Anda dengan bantuan kecerdasan buatan sekarang!
+            </p>
+            {onNavigate && (
+              <button 
+                onClick={() => onNavigate('create-modul')}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium shadow-md transition-all active:scale-95"
+              >
+                Buat Modul Sekarang
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/80">
+                  <th className="px-6 py-4 text-sm font-semibold text-slate-600 w-1/4">Judul Dokumen</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">Info Dasar (Mapel/Kelas)</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">Topik</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">Tanggal Dibuat</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold text-slate-600">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredDocs.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-slate-800 line-clamp-2">{item.title}</p>
+                      <span className="inline-block mt-1 px-2.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-indigo-50 text-indigo-600">
+                        {getTemplateName(item)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-slate-700">{getMapel(item.input_data)}</div>
+                      <div className="text-xs text-slate-500 mt-1">{getKelas(item.input_data)}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm text-slate-600 line-clamp-2">{getTopik(item.input_data)}</p>
+                    </td>
+                    <td className="px-6 py-4 text-slate-500 text-sm whitespace-nowrap">
+                      {new Date(item.created_at).toLocaleDateString('id-ID', {
+                        day: '2-digit', month: 'long', year: 'numeric'
+                      })}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-1">
+                        <button 
+                          onClick={() => handleView(item)}
+                          className="p-2 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-colors" 
+                          title="Lihat Konten"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </button>
+                        <button 
+                          onClick={() => handleDownload(item.title, item.output_content)}
+                          className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-colors" 
+                          title="Download Word"
+                        >
+                          <Download className="w-5 h-5" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(item.id)}
+                          className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors" 
+                          title="Hapus Dokumen"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      {/* Modal View Content */}
+      {isModalOpen && selectedDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
+              <div>
+                <h3 className="font-bold text-lg text-slate-800">{selectedDoc.title}</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Format: {getTemplateName(selectedDoc)} • Dibuat pada: {new Date(selectedDoc.created_at).toLocaleString('id-ID')}
+                </p>
+              </div>
+              <button 
+                onClick={closeModal}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 font-sans">
+              <div className="prose prose-sm prose-blue max-w-none text-slate-700">
+                <pre className="whitespace-pre-wrap font-sans leading-relaxed text-sm">
+                  {selectedDoc.output_content}
+                </pre>
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 rounded-b-2xl">
+              <button 
+                onClick={closeModal}
+                className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                Tutup
+              </button>
+              <button 
+                onClick={() => handleDownload(selectedDoc.title, selectedDoc.output_content)}
+                className="px-4 py-2 font-medium text-white bg-slate-800 hover:bg-slate-900 rounded-lg flex items-center gap-2 transition-all shadow-md"
+              >
+                <Download className="w-4 h-4" /> Download Word
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
