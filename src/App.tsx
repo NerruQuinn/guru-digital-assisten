@@ -9,12 +9,15 @@ import LoginPage from './components/pages/LoginPage';
 import CreateModulPage from './components/pages/CreateModulPage';
 import UploadTemplatePage from './components/pages/UploadTemplatePage';
 import ManageUsersPage from './components/pages/ManageUsersPage';
+import AdminSettingsPage from './components/pages/AdminSettingsPage';
+import { ToastProvider } from './components/ToastProvider';
 
 function App() {
   const [session, setSession] = useState<any>(null);
   const [role, setRole] = useState<string | null>(localStorage.getItem('userRole'));
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -33,6 +36,9 @@ function App() {
         setRole(null);
         localStorage.removeItem('userRole');
         setLoading(false);
+      } else if (event === 'SIGNED_IN' && session) {
+        setSession(session);
+        fetchRole(session.user.id);
       }
     });
 
@@ -94,35 +100,45 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900">
-      <Sidebar
-        activePage={activePage}
-        onPageChange={setActivePage}
-        role={role}
-      />
-      <main className="flex-1 overflow-auto flex flex-col">
-        <Header
-          title={currentPage.title}
-          breadcrumb={currentPage.breadcrumb}
-          user={session.user}
+    <ToastProvider>
+      <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden relative">
+        {/* Mobile Sidebar Overlay */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-slate-900/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+        
+        <Sidebar
+          activePage={activePage}
+          onPageChange={(page) => {
+            setActivePage(page);
+            setIsSidebarOpen(false); // Close sidebar automatically on mobile
+          }}
+          role={role}
+          isOpen={isSidebarOpen}
         />
-        <div className="flex-1 overflow-auto">
-          {activePage === 'dashboard' && (
-            <DashboardPage
-              role={role}
-              onNavigate={setActivePage}
-            />
-          )}
-          {activePage === 'create-modul' && (
-            <CreateModulPage onBack={() => setActivePage('dashboard')} />
-          )}
-          {activePage === 'templates' && <TemplatesPage role={role} />}
-          {activePage === 'history' && <HistoryPage onNavigate={setActivePage} />}
-          {activePage === 'upload-template' && <UploadTemplatePage />}
-          {activePage === 'manage-users' && <ManageUsersPage />}
-        </div>
-      </main>
-    </div>
+        
+        <main className="flex-1 overflow-auto flex flex-col w-full h-full relative">
+          <Header
+            title={currentPage.title}
+            breadcrumb={currentPage.breadcrumb}
+            user={session.user}
+            onMenuClick={() => setIsSidebarOpen(true)}
+          />
+          <div className="flex-1 overflow-auto h-full w-full relative">
+            {activePage === 'dashboard' && <DashboardPage role={role} onNavigate={setActivePage} />}
+            {activePage === 'create-modul' && <CreateModulPage onBack={() => setActivePage('dashboard')} />}
+            {activePage === 'templates' && <TemplatesPage role={role} />}
+            {activePage === 'history' && <HistoryPage onNavigate={setActivePage} />}
+            {activePage === 'upload-template' && <UploadTemplatePage />}
+            {activePage === 'manage-users' && <ManageUsersPage />}
+            {activePage === 'settings' && <AdminSettingsPage />}
+          </div>
+        </main>
+      </div>
+    </ToastProvider>
   );
 }
 

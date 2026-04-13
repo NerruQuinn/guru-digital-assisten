@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Sparkles, Loader2, CheckCircle2, ChevronRight, ChevronLeft, Plus, Trash2, Save, Download } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { generateDocx } from '../../lib/generateDocx';
+import { useToast } from '../../hooks/useToast';
 
 interface CreateModulPageProps {
   onBack: () => void;
@@ -19,6 +20,7 @@ interface OutlineMingguan {
 }
 
 const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
+  const { showToast } = useToast();
   const [step, setStep] = useState(1);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [guruName, setGuruName] = useState('');
@@ -179,10 +181,10 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
 
       const { result } = await response.json();
       setPreviewData(result);
-      
+      showToast('Modul ajar berhasil dibuat!', 'success');
     } catch (error: any) {
       console.error('Error generating:', error);
-      alert(error.message);
+      showToast(error.message || 'Gagal generate modul ajar', 'error');
     } finally {
       setIsGenerating(false);
     }
@@ -205,18 +207,17 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
 
       if (error) throw error;
       setIsSaved(true);
-      alert("Berhasil disimpan ke dokumen saya!");
-      
+      showToast('Dokumen berhasil disimpan!', 'success');
     } catch (err: any) {
       console.error('Error saving:', err.message);
-      alert('Gagal menyimpan dokumen: ' + err.message);
+      showToast('Gagal menyimpan dokumen: ' + err.message, 'error');
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
       <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors text-sm font-medium">
         <ArrowLeft className="w-4 h-4" /> Kembali ke Dashboard
       </button>

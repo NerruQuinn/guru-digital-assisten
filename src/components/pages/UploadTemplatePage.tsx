@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Upload, FileText, Trash2, FileSpreadsheet, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useToast } from '../../hooks/useToast';
+import { SkeletonTable } from '../ui/Skeleton';
 
 interface Template {
   id: string;
@@ -17,6 +19,7 @@ const UploadTemplatePage = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState('');
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetchTemplates();
@@ -54,7 +57,7 @@ const UploadTemplatePage = () => {
         .select('school_id')
         .eq('id', userData.user.id)
         .single();
-      
+
       const schoolId = profile?.school_id || null;
 
       // 3. Upload file ke Supabase Storage (bucket "documents")
@@ -78,11 +81,11 @@ const UploadTemplatePage = () => {
 
       if (insertError) throw insertError;
 
-      alert('Template berhasil diunggah!');
+      showToast('Template berhasil diunggah!', 'success');
       fetchTemplates();
     } catch (err: any) {
       console.error('Gagal upload file:', err.message);
-      alert('Gagal mengupload template: ' + err.message);
+      showToast('Gagal mengupload template: ' + err.message, 'error');
     } finally {
       setUploading(false);
       // Reset the file input
@@ -101,10 +104,11 @@ const UploadTemplatePage = () => {
       const { error } = await supabase.from('templates').delete().eq('id', id);
       if (error) throw error;
 
+      showToast('Template berhasil dihapus!', 'success');
       fetchTemplates();
     } catch (err: any) {
       console.error('Gagal hapus:', err.message);
-      alert('Gagal menghapus template: ' + err.message);
+      showToast('Gagal menghapus template: ' + err.message, 'error');
     }
   };
 
@@ -113,7 +117,7 @@ const UploadTemplatePage = () => {
   );
 
   return (
-    <div className="p-8 space-y-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-8 space-y-6 max-w-6xl mx-auto">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Upload Template</h2>
@@ -154,10 +158,10 @@ const UploadTemplatePage = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto min-h-[300px]">
+        <div className="overflow-x-auto w-full min-h-[300px]">
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="p-4">
+              <SkeletonTable columns={4} rows={4} />
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 text-slate-400 flex flex-col items-center">

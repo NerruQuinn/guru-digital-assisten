@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Search, UserCheck, ShieldAlert, Shield, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useToast } from '../../hooks/useToast';
+import { SkeletonTable } from '../ui/Skeleton';
 
 interface UserProfile {
   id: string;
@@ -15,6 +17,7 @@ const ManageUsersPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetchUsers();
@@ -35,7 +38,7 @@ const ManageUsersPage = () => {
       setUsers(data as UserProfile[] || []);
     } catch (err: any) {
       console.error('Error fetching users:', err.message);
-      alert('Gagal mengambil data user: ' + err.message);
+      showToast('Gagal mengambil data user: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -57,12 +60,13 @@ const ManageUsersPage = () => {
         .eq('id', userId);
 
       if (error) throw error;
-      
+
+      showToast(`Berhasil mengubah role ${userName} menjadi ${newRole}`, 'success');
       // Update local state without refetching entirely
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } catch (err: any) {
       console.error('Error updating role:', err.message);
-      alert('Gagal memperbarui role: ' + err.message);
+      showToast('Gagal memperbarui role: ' + err.message, 'error');
     } finally {
       setProcessingId(null);
     }
@@ -76,7 +80,7 @@ const ManageUsersPage = () => {
   });
 
   return (
-    <div className="p-8 space-y-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-8 space-y-6 max-w-6xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Kelola Guru & Akses</h2>
@@ -103,11 +107,10 @@ const ManageUsersPage = () => {
         </div>
 
         {/* Content Area */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto w-full">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-slate-500 font-medium">Memuat data pengguna...</p>
+            <div className="p-4">
+              <SkeletonTable columns={5} rows={5} />
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 px-4 text-center">

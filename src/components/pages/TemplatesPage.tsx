@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Plus, FileText, Download, Trash2, Eye, Search, FileSpreadsheet, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useToast } from '../../hooks/useToast';
+import { SkeletonTable } from '../ui/Skeleton';
 
 interface TemplatesPageProps {
   role: string | null;
@@ -20,6 +22,7 @@ const TemplatesPage = ({ role }: TemplatesPageProps) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetchTemplates();
@@ -54,6 +57,7 @@ const TemplatesPage = ({ role }: TemplatesPageProps) => {
 
     if (uploadError) {
       console.error('Gagal upload file:', uploadError.message);
+      showToast('Gagal mengupload template!', 'error');
       setUploading(false);
       return;
     }
@@ -71,7 +75,9 @@ const TemplatesPage = ({ role }: TemplatesPageProps) => {
 
     if (insertError) {
       console.error('Gagal simpan metadata:', insertError.message);
+      showToast('Gagal menyimpan detail template!', 'error');
     } else {
+      showToast('Template berhasil diupload!', 'success');
       fetchTemplates(); // refresh list
     }
 
@@ -88,7 +94,9 @@ const TemplatesPage = ({ role }: TemplatesPageProps) => {
     const { error } = await supabase.from('templates').delete().eq('id', id);
     if (error) {
       console.error('Gagal hapus:', error.message);
+      showToast('Gagal menghapus template.', 'error');
     } else {
+      showToast('Template berhasil dihapus!', 'success');
       fetchTemplates();
     }
   };
@@ -100,6 +108,7 @@ const TemplatesPage = ({ role }: TemplatesPageProps) => {
 
     if (error || !data) {
       console.error('Gagal download:', error?.message);
+      showToast('Gagal download dokumen.', 'error');
       return;
     }
 
@@ -116,8 +125,8 @@ const TemplatesPage = ({ role }: TemplatesPageProps) => {
   );
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">
             {role === 'admin' ? 'Kelola Template' : 'Dokumen Saya'}
@@ -165,10 +174,10 @@ const TemplatesPage = ({ role }: TemplatesPageProps) => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto w-full">
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="p-4">
+              <SkeletonTable columns={4} rows={4} />
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 text-slate-400">

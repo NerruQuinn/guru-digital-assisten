@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^1.5.0",
     "@supabase/supabase-js": "^2.57.4",
     "docx": "^9.6.1",
     "file-saver": "^2.0.5",

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Download, Eye, Trash2, Search, FileText, X, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { generateDocx } from '../../lib/generateDocx';
+import { useToast } from '../../hooks/useToast';
+import { SkeletonTable } from '../ui/Skeleton';
 
 interface HistoryPageProps {
   onNavigate?: (page: string) => void;
@@ -21,6 +23,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
   const [documents, setDocuments] = useState<GeneratedDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const { showToast } = useToast();
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -81,19 +84,21 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
 
       if (error) throw error;
 
+      showToast('Dokumen berhasil dihapus!', 'success');
       fetchHistory(); // Refresh the list
     } catch (error: any) {
       console.error('Failed to delete:', error.message);
-      alert('Gagal menghapus dokumen.');
+      showToast('Gagal menghapus dokumen.', 'error');
     }
   };
 
   const handleDownload = async (title: string, content: string) => {
     try {
       await generateDocx(title, content);
+      showToast('Dokumen berhasil diunduh!', 'success');
     } catch (err) {
       console.error('Download failed', err);
-      alert('Gagal mengunduh dokumen.');
+      showToast('Gagal mengunduh dokumen.', 'error');
     }
   };
 
@@ -134,7 +139,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
   });
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Riwayat Pembuatan</h2>
@@ -158,31 +163,30 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
         </div>
 
         {/* Content Area */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-slate-500 font-medium">Memuat riwayat dokumen...</p>
-          </div>
-        ) : filteredDocs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-            <div className="bg-blue-50 p-6 rounded-full mb-4">
-              <FileText className="w-16 h-16 text-blue-300" />
+        <div className="overflow-x-auto w-full">
+          {loading ? (
+            <div className="p-4">
+              <SkeletonTable columns={5} rows={5} />
             </div>
-            <h3 className="text-lg font-bold text-slate-700 mb-2">Belum ada modul yang dibuat</h3>
-            <p className="text-slate-500 max-w-sm mb-6">
-              Riwayat dokumen Anda kosong. Mulai rancang modul ajar pertama Anda dengan bantuan kecerdasan buatan sekarang!
-            </p>
-            {onNavigate && (
-              <button
-                onClick={() => onNavigate('create-modul')}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium shadow-md transition-all active:scale-95"
-              >
-                Buat Modul Sekarang
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
+          ) : filteredDocs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+              <div className="bg-blue-50 p-6 rounded-full mb-4">
+                <FileText className="w-16 h-16 text-blue-300" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-700 mb-2">Belum ada modul yang dibuat</h3>
+              <p className="text-slate-500 max-w-sm mb-6">
+                Riwayat dokumen Anda kosong. Mulai rancang modul ajar pertama Anda dengan bantuan kecerdasan buatan sekarang!
+              </p>
+              {onNavigate && (
+                <button
+                  onClick={() => onNavigate('create-modul')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium shadow-md transition-all active:scale-95"
+                >
+                  Buat Modul Sekarang
+                </button>
+              )}
+            </div>
+          ) : (
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80">
@@ -243,8 +247,8 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Modal View Content */}
