@@ -24,7 +24,7 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
   const [step, setStep] = useState(1);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [guruName, setGuruName] = useState('');
-  
+
   // Step 1: Info Dasar
   const [templateId, setTemplateId] = useState('');
   const [tahunAjaran, setTahunAjaran] = useState('');
@@ -54,7 +54,7 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
   // Step 4: Generate & Review
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [previewData, setPreviewData] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<any | null>(null);
   const [isSaved, setIsSaved] = useState(false);
 
   // Lists for checkboxes
@@ -89,7 +89,7 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
       }
       // Initialize outline length based on durasiMinggu
       if (outline.length === 0 && typeof durasiMinggu === 'number') {
-        const initialOutline = Array.from({length: durasiMinggu}, (_, i) => ({
+        const initialOutline = Array.from({ length: durasiMinggu }, (_, i) => ({
           minggu: i + 1, tujuan: '', kegiatan: ''
         }));
         setOutline(initialOutline);
@@ -114,7 +114,7 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setStep(prev => Math.min(prev + 1, 4));
   };
-  
+
   const handlePrevStep = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setStep(prev => Math.max(prev - 1, 1));
@@ -163,20 +163,25 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
     setPreviewData(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-rpp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({ formData: compileFormData() }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-rpp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ formData: compileFormData() }),
+        }
+      );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Terjadi kesalahan saat generate');
+        let errDesc = 'Terjadi kesalahan saat generate';
+        try {
+          const errorText = await response.text();
+          errDesc = `Server Error: ${response.status} - ${errorText}`;
+        } catch (e) { }
+        throw new Error(errDesc);
       }
 
       const { result } = await response.json();
@@ -196,7 +201,7 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const title = `Modul Ajar - ${mapel} - ${topik} (Q${quarter})`;
-      
+
       const { error } = await supabase.from('generated_documents').insert({
         guru_id: user?.id,
         template_id: templateId,
@@ -279,7 +284,7 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Grade/Kelas <span className="text-red-500">*</span></label>
                   <select value={grade} onChange={(e) => setGrade(e.target.value)} className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50">
                     <option value="">Pilih</option>
-                    {Array.from({length: 12}, (_, i) => <option key={i+1} value={`Grade ${i+1}`}>Grade {i+1}</option>)}
+                    {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={`Grade ${i + 1}`}>Grade {i + 1}</option>)}
                   </select>
                 </div>
                 <div>
@@ -294,21 +299,21 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Mata Pelajaran <span className="text-red-500">*</span></label>
-                  <input type="text" value={mapel} onChange={e => setMapel(e.target.value)} placeholder="Contoh: Matematika" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"/>
+                  <input type="text" value={mapel} onChange={e => setMapel(e.target.value)} placeholder="Contoh: Matematika" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Topik Unit <span className="text-red-500">*</span></label>
-                  <input type="text" value={topik} onChange={e => setTopik(e.target.value)} placeholder="Contoh: Aljabar" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"/>
+                  <input type="text" value={topik} onChange={e => setTopik(e.target.value)} placeholder="Contoh: Aljabar" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Durasi Unit (Minggu) <span className="text-red-500">*</span></label>
-                  <input type="number" min="1" value={durasiMinggu} onChange={e => setDurasiMinggu(e.target.value ? Number(e.target.value) : '')} placeholder="Berlaku berapa minggu" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"/>
+                  <input type="number" min="1" value={durasiMinggu} onChange={e => setDurasiMinggu(e.target.value ? Number(e.target.value) : '')} placeholder="Berlaku berapa minggu" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Alokasi Waktu/Sesi (Menit) <span className="text-red-500">*</span></label>
-                  <input type="number" min="1" value={alokasiSesi} onChange={e => setAlokasiSesi(e.target.value ? Number(e.target.value) : '')} placeholder="Contoh: 45" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"/>
+                  <input type="number" min="1" value={alokasiSesi} onChange={e => setAlokasiSesi(e.target.value ? Number(e.target.value) : '')} placeholder="Contoh: 45" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
                 </div>
               </div>
             </div>
@@ -320,14 +325,14 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Konsep Makro <span className="text-red-500">*</span></label>
-                  <textarea value={makro} onChange={e => setMakro(e.target.value)} rows={2} placeholder="Sistem, Skala, Bukti, dll." className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"/>
+                  <textarea value={makro} onChange={e => setMakro(e.target.value)} rows={2} placeholder="Sistem, Skala, Bukti, dll." className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Konsep Mikro <span className="text-red-500">*</span></label>
-                  <textarea value={mikro} onChange={e => setMikro(e.target.value)} rows={2} placeholder="Konsep spesifik terkait topik" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"/>
+                  <textarea value={mikro} onChange={e => setMikro(e.target.value)} rows={2} placeholder="Konsep spesifik terkait topik" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none" />
                 </div>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-3">Elemen Pembelajaran (Pilih min. 1) <span className="text-red-500">*</span></label>
                 <div className="flex flex-wrap gap-2">
@@ -341,17 +346,17 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Tujuan Pembelajaran <span className="text-red-500">*</span></label>
-                <textarea value={tujuan} onChange={e => setTujuan(e.target.value)} rows={3} placeholder="1. Siswa mampu...\n2. Siswa dapat..." className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"/>
+                <textarea value={tujuan} onChange={e => setTujuan(e.target.value)} rows={3} placeholder="1. Siswa mampu...\n2. Siswa dapat..." className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Enduring Understanding (EU) <span className="text-red-500">*</span></label>
-                <textarea value={eu} onChange={e => setEu(e.target.value)} rows={2} placeholder="Pemahaman jangka panjang yang diharapkan" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"/>
+                <textarea value={eu} onChange={e => setEu(e.target.value)} rows={2} placeholder="Pemahaman jangka panjang yang diharapkan" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none" />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Essential Question (EQ) <span className="text-red-500">*</span></label>
-                <textarea value={eq} onChange={e => setEq(e.target.value)} rows={2} placeholder="Pertanyaan pemantik (1-3 pertanyaan)" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"/>
+                <textarea value={eq} onChange={e => setEq(e.target.value)} rows={2} placeholder="Pertanyaan pemantik (1-3 pertanyaan)" className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none" />
               </div>
 
               <div>
@@ -385,21 +390,21 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
                 <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
                   <span className="font-semibold text-slate-700 text-sm">Outline per Minggu <span className="text-red-500">*</span></span>
                   <button type="button" onClick={addOutlineRow} className="text-blue-600 hover:bg-blue-100 p-1 rounded transition-colors" title="Tambah Baris">
-                    <Plus className="w-5 h-5"/>
+                    <Plus className="w-5 h-5" />
                   </button>
                 </div>
                 <div className="divide-y divide-slate-100 p-2">
                   {outline.map((row, idx) => (
                     <div key={idx} className="flex flex-col md:flex-row gap-3 py-3 px-2">
                       <div className="w-16 flex-shrink-0 pt-2 font-medium text-slate-500 text-sm text-center">Mg. {row.minggu}</div>
-                      <textarea value={row.tujuan} onChange={e => updateOutlineRow(idx, 'tujuan', e.target.value)} placeholder="Tujuan target minggu ini" className="w-full md:w-1/3 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none h-16"/>
-                      <textarea value={row.kegiatan} onChange={e => updateOutlineRow(idx, 'kegiatan', e.target.value)} placeholder="Ringkasan kegiatan belajar" className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none h-16"/>
+                      <textarea value={row.tujuan} onChange={e => updateOutlineRow(idx, 'tujuan', e.target.value)} placeholder="Tujuan target minggu ini" className="w-full md:w-1/3 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none h-16" />
+                      <textarea value={row.kegiatan} onChange={e => updateOutlineRow(idx, 'kegiatan', e.target.value)} placeholder="Ringkasan kegiatan belajar" className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none h-16" />
                       <button type="button" onClick={() => removeOutlineRow(idx)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg self-center hidden md:block">
-                        <Trash2 className="w-4 h-4"/>
+                        <Trash2 className="w-4 h-4" />
                       </button>
                       {/* Trash button mobile res */}
                       <button type="button" onClick={() => removeOutlineRow(idx)} className="text-red-500 text-xs text-right mt-1 md:hidden flex items-center justify-end gap-1">
-                        <Trash2 className="w-3 h-3"/> Hapus baris ini
+                        <Trash2 className="w-3 h-3" /> Hapus baris ini
                       </button>
                     </div>
                   ))}
@@ -410,17 +415,17 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Asesmen Formatif <span className="text-red-500">*</span></label>
-                  <textarea value={asesmenFormatif} onChange={e => setAsesmenFormatif(e.target.value)} rows={3} placeholder="Kapan & kriteria pengerjaan..." className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"/>
+                  <textarea value={asesmenFormatif} onChange={e => setAsesmenFormatif(e.target.value)} rows={3} placeholder="Kapan & kriteria pengerjaan..." className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Asesmen Sumatif <span className="text-red-500">*</span></label>
-                  <textarea value={asesmenSumatif} onChange={e => setAsesmenSumatif(e.target.value)} rows={3} placeholder="Deskripsi asesmen akhir/project..." className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"/>
+                  <textarea value={asesmenSumatif} onChange={e => setAsesmenSumatif(e.target.value)} rows={3} placeholder="Deskripsi asesmen akhir/project..." className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none" />
                 </div>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">KKM / Nilai Minimum <span className="text-red-500">*</span></label>
-                <input type="number" min="0" max="100" value={kkm} onChange={e => setKkm(e.target.value ? Number(e.target.value) : '')} placeholder="Nilai skala 0-100" className="w-32 border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"/>
+                <input type="number" min="0" max="100" value={kkm} onChange={e => setKkm(e.target.value ? Number(e.target.value) : '')} placeholder="Nilai skala 0-100" className="w-32 border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
               </div>
             </div>
           )}
@@ -451,8 +456,20 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
                     {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : isSaved ? <CheckCircle2 className="w-5 h-5" /> : <Save className="w-5 h-5" />}
                     {isSaved ? "Tersimpan" : "Simpan Dokumen"}
                   </button>
-                  <button 
-                    onClick={() => generateDocx(`Modul Ajar - ${mapel} - ${topik}`, previewData)}
+                  <button
+                    onClick={async () => {
+                      try {
+                        const { data: tData } = await supabase.from('templates').select('file_path').eq('id', templateId).single();
+                        if (tData?.file_path) {
+                          const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(tData.file_path);
+                          await generateDocx(`Modul Ajar - ${mapel} - ${topik}`, previewData, publicUrl);
+                        } else {
+                          showToast('Template tidak ditemukan', 'error');
+                        }
+                      } catch (err: any) {
+                        showToast('Gagal download docx: ' + err.message, 'error');
+                      }
+                    }}
                     className="py-3 rounded-xl font-semibold flex items-center justify-center gap-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all active:scale-[0.98]">
                     <Download className="w-5 h-5" /> Download (.docx)
                   </button>
@@ -464,16 +481,16 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
           {/* Navigation Controls */}
           {step < 4 && (
             <div className="flex justify-between mt-10 pt-6 border-t border-slate-100">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={handlePrevStep}
                 disabled={step === 1}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-slate-600 font-medium hover:bg-slate-50 border border-transparent hover:border-slate-200 disabled:opacity-0 transition-all"
               >
                 <ChevronLeft className="w-4 h-4" /> Sebelumnya
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={handleNextStep}
                 className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-slate-800 active:scale-95 transition-all shadow-md"
               >
@@ -483,9 +500,9 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
           )}
           {step === 4 && (
             <div className="mt-8 pt-4">
-                <button type="button" onClick={handlePrevStep} className="text-slate-500 hover:text-slate-800 text-sm font-medium flex items-center gap-1 transition-colors">
-                  <ChevronLeft className="w-4 h-4" /> Kembali Edit Informasi
-                </button>
+              <button type="button" onClick={handlePrevStep} className="text-slate-500 hover:text-slate-800 text-sm font-medium flex items-center gap-1 transition-colors">
+                <ChevronLeft className="w-4 h-4" /> Kembali Edit Informasi
+              </button>
             </div>
           )}
         </div>
@@ -510,7 +527,7 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
               ) : previewData ? (
                 <div className="prose prose-sm prose-blue max-w-none text-slate-700">
                   <pre className="whitespace-pre-wrap font-sans text-sm p-4 bg-white border border-slate-100 rounded-lg shadow-inner leading-relaxed">
-                    {previewData}
+                    {JSON.stringify(previewData, null, 2)}
                   </pre>
                 </div>
               ) : (

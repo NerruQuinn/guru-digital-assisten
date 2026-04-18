@@ -14,25 +14,13 @@ serve(async (req) => {
   try {
     const { formData } = await req.json()
     
-    // Inisialisasi Supabase Client
+    // Inisialisasi Supabase Client dengan Service Role Key
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('APP_SECRET_KEY') ?? '',
     )
 
-    // Dapatkan data user
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser()
 
-    if (!user) {
-      throw new Error('Not authenticated')
-    }
 
     // Ambil detail template dari tabel templates
     const { data: templateData, error: templateError } = await supabaseClient
@@ -56,7 +44,7 @@ serve(async (req) => {
     }
 
     // Handling PDF Base64 jika tipe file PDF
-    let documentMessageContent: any = null;
+    let documentMessagePart: any = null;
     let templatePromptAddition = `\nNama Template yang harus diikuti formatnya: ${templateData.name}\n`;
 
     if (templateData.file_type === 'pdf') {
@@ -69,11 +57,10 @@ serve(async (req) => {
        }
        const base64Data = btoa(binaryString);
 
-       documentMessageContent = {
-         type: "document",
-         source: {
-            type: "base64",
-            media_type: "application/pdf",
+       // Format untuk Gemini API
+       documentMessagePart = {
+         inlineData: {
+            mimeType: "application/pdf",
             data: base64Data
          }
        };
@@ -90,11 +77,10 @@ serve(async (req) => {
 
     const textPrompt = `
 Kamu adalah AI Pembuat Modul Ajar Level Ahli / Master Teacher.
-Buat dokumen Modul Ajar/Lesson Plan yang sangat mendalam berdasarkan data berikut dan sesuaikan formating dengan konteks Template.
-
 ${templatePromptAddition}
+${templateData.structure_prompt || ''}
 
-=== IDENTITAS & INFO DASAR (STEP 1) ===
+=== IDENTITAS & INFO DASAR ===
 - Mata Pelajaran: ${s1.mapel}
 - Grade/Kelas: ${s1.grade}
 - Topik Unit: ${s1.topik}
@@ -104,7 +90,7 @@ ${templatePromptAddition}
 - Target Alokasi Sesi: ${s1.alokasi_sesi} Menit/Pertemuan
 - Nama Guru Pengampu: ${formData.guru_name}
 
-=== TUJUAN & KONSEP (STEP 2) ===
+=== TUJUAN & KONSEP ===
 - Konsep Makro Pembelajaran: ${s2.makro}
 - Konsep Mikro Spesifik: ${s2.mikro}
 - Elemen Profil/Kemahiran: ${s2.elemen_belajar?.join(', ')}
@@ -114,59 +100,119 @@ ${s2.tujuan}
 - Enduring Understanding (EU) / Pemahaman Makna: ${s2.eu}
 - Essential Question (EQ) / Pertanyaan Pemantik: ${s2.eq}
 
-=== STRATEGI & ASESMEN (STEP 3) ===
+=== STRATEGI & ASESMEN ===
 - Metode Pembelajaran Utama: ${s3.metode?.join(', ')}
 - Outline Target Per Minggu:
-  ${s3.outline?.map((o: any) => `* Minggu ${o.minggu}: ${o.tujuan} | Rencana Kegiatan: ${o.kegiatan}`).join('\n  ')}
+  ${s3.outline?.map((o: any) => '* Minggu ' + o.minggu + ': ' + o.tujuan + ' | Rencana Kegiatan: ' + o.kegiatan).join('\n  ')}
 - Rencana Asesmen Formatif: ${s3.asesmen_formatif}
 - Rencana Asesmen Sumatif: ${s3.asesmen_sumatif}
 - Standar Kelulusan/KKM: ${s3.kkm}
 
 === PENUGASAN KHUSUS UNTUK MU ===
-Berdasarkan data di atas, mohon hasilkan Modul Ajar utuh dengan instruksi mutlak ini:
-1. Formulasikan **Student Expected Outcome** yang selaras dengan EU, EQ, dan Tujuan Pembelajaran. Pastikan tujuan tersebut dijabarkan dengan naratif berdasar hirarki kognitif (taksonomi Bloom).
-2. Tuliskan implementasi nyata mengenai detail Metode Pembelajaran yang dipilih (jelaskan "Mengapa metode ${s3.metode?.join(', ')} ditekankan pada bab ini?").
-3. Ekspand **Strategi Mingguan** (Outline) yang saya sediakan menjadi **narasi lengkap langkah per langkah per minggu**. Saya hanya memberikan ringkasan (tujuan & kegiatan), kamu harus membangunnya menjadi deskripsi langkah awal, inti, penutup per minggu!
-4. Buat **Rubrik Asesmen Sumatif/Formatif spesifik dengan 4 level** kriteria pencapaian untuk KKM ${s3.kkm}.
-5. Lengkapi akhir modul dengan kolom **Refleksi Guru**.
+Berdasarkan data di atas, mohon hasilkan nilai JSON untuk mengisi template Modul Ajar dengan instruksi mutlak ini:
+1. Setiap kegiatan SELALU diawali "salam dan doa" dan diakhiri "doa".
+2. EU dan Refleksi Guru HARUS mengandung nilai Kristiani + kutipan ayat Alkitab yang relevan.
+3. Refleksi Guru ditulis naratif minimal 3 paragraf, bukan poin-poin.
+4. Tabel mingguan harus persis sejumlah durasi minggu (${s1.durasi_minggu}). Minggu pertama selalu bertipe "Tuning In". Minggu terakhir selalu bertipe refleksi/presentasi karya.
+5. Kembalikan HASIL HANYA DALAM FORMAT JSON SESUAI DENGAN STRUKTUR BERIKUT INI. JANGAN ADA TEXT LAIN SELAIN JSON!
 
-Tulislah output Modul Ajar-nya SEKARANG JUGA HANYA dalam format markdown yang langsung dapat dirender dan dibaca. TIDAK ADA intro chat seperti 'Tentu, ini modul ajarnya'.
+{
+  "tahun_ajaran": "",
+  "grade": "",
+  "quarter": "",
+  "mapel": "",
+  "topik": "",
+  "durasi": "",
+  "guru": "",
+  "makro": "",
+  "mikro": "",
+  "elemen": "",
+  "tujuan_pembelajaran": "",
+  "alokasi_waktu": "",
+  "eu": "",
+  "eq": "",
+  "student_expected_outcome": "",
+  "capaian_pembelajaran": "",
+  "nilai_kebajikan": "",
+  "transdisipliner": "",
+  "kompetensi_prasyarat": "",
+  "kompetensi_target": "",
+  "elaborasi_berkembang": "",
+  "elaborasi_kompeten": "",
+  "elaborasi_sangat_kompeten": "",
+  "metode_pembelajaran": "",
+  "sumber_pembelajaran": "",
+  "sarana_prasarana": "",
+  "asesmen_formatif": "",
+  "asesmen_sumatif": "",
+  "tindakan_nyata": "",
+  "outline_mingguan": [
+    { "minggu": 1, "label": "Tuning In", "tujuan": "", "tahapan": "", "waktu": "70" }
+  ],
+  "timeline": [
+    { "due_date": "", "kegiatan": "" }
+  ],
+  "prosedur_sumatif": [""],
+  "kkm": "",
+  "indikator_kkm": [""],
+  "rubrik": [
+    { "level": "Sangat Baik (91-100)", "kriteria": "" },
+    { "level": "Baik (81-90)", "kriteria": "" },
+    { "level": "Memenuhi Standar (70-80)", "kriteria": "" },
+    { "level": "Perlu Meningkatkan (<70)", "kriteria": "" }
+  ],
+  "refleksi": "",
+  "nama_guru": "",
+  "nama_principal": "Denny Pattinasarany",
+  "nama_koordinator": "Kristina Puji Astuti"
+}
 `
 
-    const contentArray: any[] = [];
-    if (documentMessageContent) {
-       contentArray.push(documentMessageContent);
+    const partsArray: any[] = [];
+    if (documentMessagePart) {
+       partsArray.push(documentMessagePart);
     }
-    contentArray.push({ type: "text", text: textPrompt });
+    partsArray.push({ text: textPrompt });
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY') ?? '';
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': Deno.env.get('ANTHROPIC_API_KEY') ?? '',
-        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 5000,
-        messages: [{ role: 'user', content: contentArray }],
+        contents: [{ role: 'user', parts: partsArray }],
+        generationConfig: {
+          responseMimeType: "application/json",
+        }
       }),
     })
 
-    const anthropicData = await response.json()
+    const geminiData = await response.json()
     
     if (!response.ok) {
-        console.error("Anthropic error:", anthropicData);
-        throw new Error(anthropicData.error?.message || "Error generating content with Claude");
+        console.error("Gemini error:", geminiData);
+        throw new Error(geminiData.error?.message || "Error generating content with Gemini API");
     }
 
-    const result = anthropicData.content[0].text
-
-    // Edge function langsung mengirim balik respon, TIDAK auto-insert. 
-    // Insert dilakukan frontend lewat tombol Save.
+    const textualResult = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
     
+    if (!textualResult) {
+        console.error("Gemini no result error. Payload:", JSON.stringify(geminiData));
+        throw new Error("Gemini API mengembalikan hasil kosong (kemungkinan diblokir oleh Safety Settings).");
+    }
+
+    let parsedJSON;
+    try {
+        parsedJSON = JSON.parse(textualResult);
+    } catch (e) {
+        // Fallback in case there are missing markdown ticks
+        const cleaned = textualResult.replace(/^```json/g, '').replace(/^```/g, '').replace(/```$/g, '').trim();
+        parsedJSON = JSON.parse(cleaned);
+    }
+
     return new Response(
-      JSON.stringify({ result }),
+      JSON.stringify({ result: parsedJSON }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error: any) {
