@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Sparkles, Loader2, CheckCircle2, ChevronRight, ChevronLeft, Plus, Trash2, Save, Download } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2, ChevronRight, ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { generateDocx } from '../../lib/generateDocx';
+import { deepSanitize, findUnsafeKeys } from '../../lib/sanitize';
+
 import { useToast } from '../../hooks/useToast';
 
 interface CreateModulPageProps {
   onBack: () => void;
+  onNavigate?: (page: string) => void;
 }
 
 interface Template {
@@ -19,11 +22,12 @@ interface OutlineMingguan {
   kegiatan: string;
 }
 
-const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
+const CreateModulPage = ({ onBack, onNavigate }: CreateModulPageProps) => {
   const { showToast } = useToast();
   const [step, setStep] = useState(1);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [guruName, setGuruName] = useState('');
+  const [schoolId, setSchoolId] = useState<string | null>(null);
 
   // Step 1: Info Dasar
   const [templateId, setTemplateId] = useState('');
@@ -51,11 +55,8 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
   const [asesmenSumatif, setAsesmenSumatif] = useState('');
   const [kkm, setKkm] = useState<number | ''>('');
 
-  // Step 4: Generate & Review
+  // Step 4: Generate
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [previewData, setPreviewData] = useState<any | null>(null);
-  const [isSaved, setIsSaved] = useState(false);
 
   // Lists for checkboxes
   const listElemen = ["Visual-Spasial", "Kecakapan Digital", "Literasi", "Numerasi", "Sains-Teknologi", "Logika", "Sosial-Emosional"];
@@ -75,8 +76,11 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
-      if (data?.full_name) setGuruName(data.full_name);
+      const { data } = await supabase.from('profiles').select('full_name, school_id').eq('id', user.id).single();
+      if (data) {
+        if (data.full_name) setGuruName(data.full_name);
+        if (data.school_id) setSchoolId(data.school_id);
+      }
     }
   };
 
@@ -157,12 +161,43 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
     };
   };
 
+  const saveToDB = async (result: any) => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    let currentSchoolId = schoolId;
+    if (!currentSchoolId && user?.id) {
+      const { data } = await supabase.from('profiles').select('school_id').eq('id', user.id).single();
+      if (data?.school_id) {
+        currentSchoolId = data.school_id;
+        setSchoolId(data.school_id);
+      }
+    }
+
+    if (!currentSchoolId) {
+      throw new Error('School ID tidak ditemukan. Hubungi admin.');
+    }
+
+    const title = `Modul Ajar - ${mapel} - ${topik} (Q${quarter})`;
+    
+    const { error: saveError } = await supabase.from('generated_documents').insert({
+      guru_id: user?.id,
+      school_id: currentSchoolId,
+      template_id: templateId,
+      title: title,
+      input_data: compileFormData(),
+      output_content: result
+    }).select('id').single();
+
+    if (saveError) {
+      console.error('saveToDB error:', saveError);
+      throw new Error(saveError.message || 'Gagal menyimpan ke database');
+    }
+  };
+
   const handleGenerate = async () => {
     setIsGenerating(true);
-    setIsSaved(false);
-    setPreviewData(null);
-
     try {
+      // ── 1. Panggil Edge Function ──────────────────────────────────────────
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-rpp`,
         {
@@ -176,50 +211,89 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
       );
 
       if (!response.ok) {
-        let errDesc = 'Terjadi kesalahan saat generate';
-        try {
-          const errorText = await response.text();
-          errDesc = `Server Error: ${response.status} - ${errorText}`;
-        } catch (e) { }
-        throw new Error(errDesc);
+        const errorBody = await response.text().catch(() => '');
+        throw new Error(`Server error ${response.status}: ${errorBody.substring(0, 200)}`);
       }
 
-      const { result } = await response.json();
-      setPreviewData(result);
-      showToast('Modul ajar berhasil dibuat!', 'success');
+      const parsed = await response.json();
+      const result = parsed?.result;
+
+      if (!result || typeof result !== 'object') {
+        throw new Error('Tidak ada hasil dari AI');
+      }
+
+      // ── 2. NUCLEAR SANITIZATION ──────────────────────────────────────────
+      // deepSanitize recursively converts ALL values to strings.
+      // Arrays are preserved (for docxtemplater loops) but their items are sanitized.
+      // No object can EVER reach React's rendering pipeline.
+      const safeResult = deepSanitize(result);
+
+      // Verify sanitization (dev safety check)
+      const unsafeKeys = findUnsafeKeys(safeResult);
+      if (unsafeKeys.length > 0) {
+        console.warn('[SANITIZE] Unsafe keys detected after sanitization:', unsafeKeys);
+        // Force-fix any remaining unsafe values
+        for (const key of Object.keys(safeResult)) {
+          const val = safeResult[key];
+          if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+            safeResult[key] = JSON.stringify(val);
+          }
+        }
+      }
+
+      console.log('[GENERATE] Sanitized result keys:', Object.keys(safeResult));
+
+      // ── 3. Simpan ke DB ──────────────────────────────────────────────────
+      await saveToDB(safeResult);
+      console.log('[GENERATE] Data saved to DB successfully');
+
+      // ── 4. Generate DOCX (non-fatal: jika gagal, data tetap tersimpan) ──
+      try {
+        const { data: publicUrlData } = supabase.storage
+          .from('documents')
+          .getPublicUrl('templates/1776116873663_Modul_Ajar_Template.docx');
+        const templateUrl = publicUrlData.publicUrl;
+        const title = `Modul Ajar - ${mapel} - ${topik} (Q${quarter})`;
+
+        await generateDocx(title, safeResult, templateUrl);
+        console.log('[GENERATE] DOCX generated successfully');
+      } catch (docxErr: any) {
+        // DOCX generation failure is NON-FATAL — data is already saved
+        console.error('[GENERATE] DOCX generation failed (non-fatal):', docxErr);
+        showToast('Modul tersimpan, tapi file Word gagal diunduh. Anda bisa unduh ulang dari Riwayat.', 'info');
+      }
+
+      // ── 5. Navigasi — JANGAN render data apapun ke UI! ────────────────
+      showToast('Modul berhasil dibuat dan disimpan!', 'success');
+      setTimeout(() => {
+        if (onNavigate) {
+          onNavigate('history');
+        } else {
+          onBack();
+        }
+      }, 1500);
+
     } catch (error: any) {
-      console.error('Error generating:', error);
-      showToast(error.message || 'Gagal generate modul ajar', 'error');
+      console.error('[GENERATE] Fatal error:', error);
+      // Defensive: error.message could be anything, force to string
+      let msg = 'Gagal generate modul';
+      try {
+        if (error && typeof error.message === 'string') {
+          msg = error.message;
+        } else if (error && typeof error === 'string') {
+          msg = error;
+        } else if (error) {
+          msg = JSON.stringify(error).substring(0, 200);
+        }
+      } catch {
+        msg = 'Gagal generate modul (error tidak dapat dibaca)';
+      }
+      showToast(msg, 'error');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleSaveToDB = async () => {
-    if (!previewData) return;
-    setIsSaving(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const title = `Modul Ajar - ${mapel} - ${topik} (Q${quarter})`;
-
-      const { error } = await supabase.from('generated_documents').insert({
-        guru_id: user?.id,
-        template_id: templateId,
-        title: title,
-        input_data: compileFormData(),
-        output_content: previewData
-      });
-
-      if (error) throw error;
-      setIsSaved(true);
-      showToast('Dokumen berhasil disimpan!', 'success');
-    } catch (err: any) {
-      console.error('Error saving:', err.message);
-      showToast('Gagal menyimpan dokumen: ' + err.message, 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
@@ -252,7 +326,7 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Formulir Wizard (kiri) */}
-        <div className={`bg-white rounded-xl shadow-sm border border-slate-100 p-8 h-fit ${step === 4 ? 'lg:col-span-5' : 'lg:col-span-8 lg:col-start-3'}`}>
+        <div className={`bg-white rounded-xl shadow-sm border border-slate-100 p-8 h-fit lg:col-span-8 lg:col-start-3`}>
           <h2 className="text-2xl font-bold text-slate-900 mb-6">
             {step === 1 && "Langkah 1: Informasi Dasar"}
             {step === 2 && "Langkah 2: Tujuan & Konsep"}
@@ -444,37 +518,10 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
                 </div>
               </div>
 
-              {!previewData && (
-                <button onClick={handleGenerate} disabled={isGenerating} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] shadow-xl shadow-blue-600/20">
-                  {isGenerating ? <><Loader2 className="w-6 h-6 animate-spin" /> Menganalisis Struktur...</> : <><Sparkles className="w-6 h-6" /> Generate Modul Ajar AI Sekarang</>}
-                </button>
-              )}
-
-              {previewData && (
-                <div className="grid grid-cols-2 gap-4">
-                  <button onClick={handleSaveToDB} disabled={isSaving || isSaved} className={`py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${isSaved ? 'bg-green-500 text-white cursor-default' : 'bg-slate-900 hover:bg-slate-800 text-white shadow-lg active:scale-[0.98]'}`}>
-                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : isSaved ? <CheckCircle2 className="w-5 h-5" /> : <Save className="w-5 h-5" />}
-                    {isSaved ? "Tersimpan" : "Simpan Dokumen"}
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const { data: tData } = await supabase.from('templates').select('file_path').eq('id', templateId).single();
-                        if (tData?.file_path) {
-                          const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(tData.file_path);
-                          await generateDocx(`Modul Ajar - ${mapel} - ${topik}`, previewData, publicUrl);
-                        } else {
-                          showToast('Template tidak ditemukan', 'error');
-                        }
-                      } catch (err: any) {
-                        showToast('Gagal download docx: ' + err.message, 'error');
-                      }
-                    }}
-                    className="py-3 rounded-xl font-semibold flex items-center justify-center gap-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all active:scale-[0.98]">
-                    <Download className="w-5 h-5" /> Download (.docx)
-                  </button>
-                </div>
-              )}
+              {/* Tombol Generate */}
+              <button onClick={handleGenerate} disabled={isGenerating} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] shadow-xl shadow-blue-600/20">
+                {isGenerating ? <><Loader2 className="w-6 h-6 animate-spin" /> Menyusun dan Menyimpan Modul...</> : <><Sparkles className="w-6 h-6" /> Generate &amp; Simpan Modul Ajar</>}
+              </button>
             </div>
           )}
 
@@ -507,39 +554,7 @@ const CreateModulPage = ({ onBack }: CreateModulPageProps) => {
           )}
         </div>
 
-        {/* Kotak Preview (Kanan) -> Hanya tampil besar di Step 4 */}
-        {step === 4 && (
-          <div className="lg:col-span-7 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col h-[600px] lg:h-[800px] overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-green-500" /> Preview Hasil AI
-              </h3>
-            </div>
-            <div className="p-6 overflow-y-auto flex-1 bg-slate-50/30">
-              {isGenerating ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8 text-center space-y-4">
-                  <div className="w-16 h-16 flex items-center justify-center bg-blue-50 rounded-full mb-2">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                  </div>
-                  <h4 className="text-slate-700 font-semibold text-lg">Menyusun RPP Lengkap</h4>
-                  <p className="text-sm">Menganalisis makro-mikro, menyamakan EU & EQ, merangkai narasi minggu ke minggu... Ini memakan waktu hingga satu menit.</p>
-                </div>
-              ) : previewData ? (
-                <div className="prose prose-sm prose-blue max-w-none text-slate-700">
-                  <pre className="whitespace-pre-wrap font-sans text-sm p-4 bg-white border border-slate-100 rounded-lg shadow-inner leading-relaxed">
-                    {JSON.stringify(previewData, null, 2)}
-                  </pre>
-                </div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8 text-center hover:opacity-100 transition-opacity">
-                  <Sparkles className="w-16 h-16 mb-4 opacity-20" />
-                  <p className="font-medium text-slate-600">Area Preview Dokumen</p>
-                  <p className="text-sm mt-1">Dokumen RPP Anda akan ter-render di sini setelah menekan tombol generate.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Panel preview disembunyikan sementara untuk menghindari React error #31 */}
       </div>
     </div>
   );

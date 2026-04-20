@@ -11,7 +11,8 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
     const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
+    const safeMessage = typeof message === 'string' ? message : JSON.stringify(message);
+    setToasts((prev) => [...prev, { id, message: safeMessage as string, type }]);
 
     // Auto remove after 3 seconds
     setTimeout(() => {

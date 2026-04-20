@@ -1,3 +1,4 @@
+// DEBUG TEST
 import { Home, FileText, Database, Settings, LogOut, GraduationCap, X, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -15,6 +16,7 @@ const Sidebar = ({ activePage, onPageChange, role, isOpen }: SidebarProps) => {
     { id: 'upload-template', label: 'Upload Template', icon: FileText },
     { id: 'manage-users', label: 'Kelola Guru', icon: Users },
     { id: 'settings', label: 'Setelan Admin', icon: Settings },
+    { id: 'debug', label: '🔍 Debug', icon: Database },
   ];
 
   const guruMenuItems = [
@@ -22,6 +24,7 @@ const Sidebar = ({ activePage, onPageChange, role, isOpen }: SidebarProps) => {
     { id: 'create-modul', label: 'Buat Modul Ajar', icon: FileText },
     { id: 'templates', label: 'Template Tersedia', icon: Database },
     { id: 'history', label: 'Riwayat Saya', icon: FileText },
+    { id: 'debug', label: '🔍 Debug', icon: Database },
   ];
 
   const menuItems = role === 'admin' ? adminMenuItems : guruMenuItems;

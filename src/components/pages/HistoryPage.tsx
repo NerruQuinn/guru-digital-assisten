@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Download, Eye, Trash2, Search, FileText, X, CheckCircle2 } from 'lucide-react';
+import { Download, Eye, Trash2, Search, FileText, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { generateDocx } from '../../lib/generateDocx';
 import { useToast } from '../../hooks/useToast';
 import { SkeletonTable } from '../ui/Skeleton';
+import { forceString } from '../../lib/sanitize';
 
 interface HistoryPageProps {
   onNavigate?: (page: string) => void;
@@ -13,7 +14,7 @@ interface GeneratedDoc {
   id: string;
   title: string;
   input_data: any;
-  output_content: string;
+  output_content: any;
   created_at: string;
   template_id: string;
   templates?: any;
@@ -49,7 +50,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
           output_content, 
           created_at, 
           template_id,
-          templates ( name )
+          templates ( name, file_path )
         `)
         .eq('guru_id', user.id)
         .order('created_at', { ascending: false });
@@ -92,9 +93,31 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
     }
   };
 
-  const handleDownload = async (title: string, content: string) => {
+  const handleDownload = async (doc: GeneratedDoc) => {
     try {
-      await generateDocx(title, content);
+      let dataToRender = doc.output_content;
+      if (typeof dataToRender === 'string') {
+        try {
+          dataToRender = JSON.parse(dataToRender);
+        } catch (e) {
+          // keep as string if parsing fails
+        }
+      }
+      
+      let filePath = '';
+      if (Array.isArray(doc.templates)) {
+        filePath = doc.templates[0]?.file_path || '';
+      } else if (doc.templates) {
+        filePath = doc.templates.file_path || '';
+      }
+
+      if (!filePath) {
+        throw new Error('Template file path not found');
+      }
+
+      const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+      
+      await generateDocx(doc.title, dataToRender as any, publicUrlData.publicUrl);
       showToast('Dokumen berhasil diunduh!', 'success');
     } catch (err) {
       console.error('Download failed', err);
@@ -102,33 +125,44 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
     }
   };
 
-  const getMapel = (inputData: any) => {
+  const getMapel = (inputData: any): string => {
     if (!inputData) return '-';
-    if (inputData.mapel) return inputData.mapel; // structure lama
-    if (inputData.step1?.mapel) return inputData.step1.mapel; // structure wizard baru
+    if (inputData.mapel) return forceString(inputData.mapel);
+    if (inputData.step1?.mapel) return forceString(inputData.step1.mapel);
     return '-';
   };
 
-  const getKelas = (inputData: any) => {
+  const getKelas = (inputData: any): string => {
     if (!inputData) return '-';
-    if (inputData.kelas) return inputData.kelas;
-    if (inputData.step1?.grade) return inputData.step1.grade;
+    if (inputData.kelas) return forceString(inputData.kelas);
+    if (inputData.step1?.grade) return forceString(inputData.step1.grade);
     return '-';
   };
 
-  const getTopik = (inputData: any) => {
+  const getTopik = (inputData: any): string => {
     if (!inputData) return '-';
-    if (inputData.topik) return inputData.topik;
-    if (inputData.step1?.topik) return inputData.step1.topik;
+    if (inputData.topik) return forceString(inputData.topik);
+    if (inputData.step1?.topik) return forceString(inputData.step1.topik);
     return '-';
   };
 
-  const getTemplateName = (doc: GeneratedDoc) => {
+  const getTemplateName = (doc: GeneratedDoc): string => {
     if (!doc.templates) return 'Unknown Template';
     if (Array.isArray(doc.templates)) {
-      return doc.templates[0]?.name || 'Unknown Template';
+      return forceString(doc.templates[0]?.name) || 'Unknown Template';
     }
-    return doc.templates.name || 'Unknown Template';
+    return forceString(doc.templates.name) || 'Unknown Template';
+  };
+
+  /** Safely render output_content — NEVER pass raw object to React */
+  const safeOutputContent = (content: any): string => {
+    if (!content) return '(kosong)';
+    if (typeof content === 'string') return content;
+    try {
+      return JSON.stringify(content, null, 2);
+    } catch {
+      return '(data tidak dapat ditampilkan)';
+    }
   };
 
   // Filter based on Title or Subject (mapel)
@@ -201,7 +235,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
                 {filteredDocs.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-4">
-                      <p className="font-bold text-slate-800 line-clamp-2">{item.title}</p>
+                      <p className="font-bold text-slate-800 line-clamp-2">{forceString(item.title)}</p>
                       <span className="inline-block mt-1 px-2.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-indigo-50 text-indigo-600">
                         {getTemplateName(item)}
                       </span>
@@ -228,7 +262,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
                           <Eye className="w-5 h-5" />
                         </button>
                         <button
-                          onClick={() => handleDownload(item.title, item.output_content)}
+                          onClick={() => handleDownload(item)}
                           className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-colors"
                           title="Download Word"
                         >
@@ -258,9 +292,9 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
               <div>
-                <h3 className="font-bold text-lg text-slate-800">{selectedDoc.title}</h3>
+                <h3 className="font-bold text-lg text-slate-800">{forceString(selectedDoc.title)}</h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Format: {getTemplateName(selectedDoc)} • Dibuat pada: {new Date(selectedDoc.created_at).toLocaleString('id-ID')}
+                  Format: {getTemplateName(selectedDoc)} • Dibuat pada: {forceString(new Date(selectedDoc.created_at).toLocaleString('id-ID'))}
                 </p>
               </div>
               <button
@@ -275,7 +309,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
             <div className="p-6 overflow-y-auto flex-1 font-sans">
               <div className="prose prose-sm prose-blue max-w-none text-slate-700">
                 <pre className="whitespace-pre-wrap font-sans leading-relaxed text-sm">
-                  {selectedDoc.output_content}
+                  {safeOutputContent(selectedDoc.output_content)}
                 </pre>
               </div>
             </div>
@@ -289,7 +323,7 @@ const HistoryPage = ({ onNavigate }: HistoryPageProps) => {
                 Tutup
               </button>
               <button
-                onClick={() => handleDownload(selectedDoc.title, selectedDoc.output_content)}
+                onClick={() => handleDownload(selectedDoc)}
                 className="px-4 py-2 font-medium text-white bg-slate-800 hover:bg-slate-900 rounded-lg flex items-center gap-2 transition-all shadow-md"
               >
                 <Download className="w-4 h-4" /> Download Word
