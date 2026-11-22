@@ -1,5 +1,5 @@
 // DEBUG TEST
-import { Home, FileText, Database, Settings, LogOut, GraduationCap, X, Users } from 'lucide-react';
+import { Home, FileText, Database, Settings, LogOut, GraduationCap, X, Users, BookOpen } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface SidebarProps {
@@ -12,19 +12,18 @@ interface SidebarProps {
 const Sidebar = ({ activePage, onPageChange, role, isOpen }: SidebarProps) => {
   const adminMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
+    { id: 'modul-generator', label: 'Modul Ajar', icon: BookOpen },
     { id: 'templates', label: 'Kelola Template', icon: Database },
     { id: 'upload-template', label: 'Upload Template', icon: FileText },
     { id: 'manage-users', label: 'Kelola Guru', icon: Users },
     { id: 'settings', label: 'Setelan Admin', icon: Settings },
-    { id: 'debug', label: '🔍 Debug', icon: Database },
   ];
 
   const guruMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'create-modul', label: 'Buat Modul Ajar', icon: FileText },
+    { id: 'modul-generator', label: 'Modul Ajar', icon: BookOpen },
     { id: 'templates', label: 'Template Tersedia', icon: Database },
     { id: 'history', label: 'Riwayat Saya', icon: FileText },
-    { id: 'debug', label: '🔍 Debug', icon: Database },
   ];
 
   const menuItems = role === 'admin' ? adminMenuItems : guruMenuItems;

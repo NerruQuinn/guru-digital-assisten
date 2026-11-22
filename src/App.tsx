@@ -6,11 +6,10 @@ import DashboardPage from './components/pages/DashboardPage';
 import TemplatesPage from './components/pages/TemplatesPage';
 import HistoryPage from './components/pages/HistoryPage';
 import LoginPage from './components/pages/LoginPage';
-import CreateModulPage from './components/pages/CreateModulPage';
 import UploadTemplatePage from './components/pages/UploadTemplatePage';
 import ManageUsersPage from './components/pages/ManageUsersPage';
 import AdminSettingsPage from './components/pages/AdminSettingsPage';
-import DebugLastDoc from './components/pages/DebugLastDoc';
+import ModulGeneratorPage from './components/pages/ModulGeneratorPage';
 import { ToastProvider } from './components/ToastProvider';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -81,8 +80,6 @@ function App() {
     'upload-template': { title: 'Upload Template', breadcrumb: 'Upload Template' },
     'manage-users': { title: 'Kelola Guru', breadcrumb: 'Kelola Guru' },
     settings: { title: 'Admin Settings', breadcrumb: 'Settings' },
-    'create-modul': { title: 'Buat Modul Ajar', breadcrumb: 'Buat Modul Ajar' },
-    debug: { title: 'Debug Last Doc', breadcrumb: 'Debug' },
   };
 
   const currentPage = pageConfig[activePage] ?? { title: 'Dashboard', breadcrumb: 'Dashboard' };
@@ -133,13 +130,12 @@ function App() {
           />
           <div className="flex-1 overflow-auto h-full w-full relative">
             {activePage === 'dashboard' && <DashboardPage role={role} onNavigate={setActivePage} />}
-            {activePage === 'create-modul' && <CreateModulPage onBack={() => setActivePage('dashboard')} onNavigate={setActivePage} />}
+            {activePage === 'modul-generator' && <ModulGeneratorPage />}
             {activePage === 'templates' && <TemplatesPage role={role} />}
             {activePage === 'history' && <HistoryPage onNavigate={setActivePage} />}
             {activePage === 'upload-template' && <UploadTemplatePage />}
             {activePage === 'manage-users' && <ManageUsersPage />}
             {activePage === 'settings' && <AdminSettingsPage />}
-            {activePage === 'debug' && <DebugLastDoc />}
           </div>
         </main>
       </div>
